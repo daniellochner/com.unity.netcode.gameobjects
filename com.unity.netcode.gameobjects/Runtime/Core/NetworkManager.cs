@@ -355,7 +355,7 @@ namespace Unity.Netcode
         /// </summary>
         public event Action OnServerStarted = null;
 
-        public event Action<NetworkObject> OnPreSpawn = null;
+        public Action<NetworkObject> OnPreSpawn = null;
 
         /// <summary>
         /// Delegate type called when connection has been approved. This only has to be set on the server.
