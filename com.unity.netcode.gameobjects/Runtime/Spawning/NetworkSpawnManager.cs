@@ -505,6 +505,12 @@ namespace Unity.Netcode
 
             networkObject.IsPlayerObject = playerObject;
 
+			NetworkVariant variant = networkObject.GetComponent<NetworkVariant>();
+			if (variant != null && networkObject.IsOwner)
+			{
+				variant.Swap();
+			}
+
             SpawnedObjects.Add(networkObject.NetworkObjectId, networkObject);
             SpawnedObjectsList.Add(networkObject);
 
