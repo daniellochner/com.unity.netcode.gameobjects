@@ -566,6 +566,8 @@ namespace Unity.Netcode
 
             networkObject.IsPlayerObject = playerObject;
 
+            NetworkManager.OnPreSpawn?.Invoke(networkObject);
+
             SpawnedObjects.Add(networkObject.NetworkObjectId, networkObject);
             SpawnedObjectsList.Add(networkObject);
 
