@@ -5,7 +5,7 @@ namespace Unity.Netcode.EditorTests
 {
     public class MessageRegistrationTests
     {
-        private struct TestMessageOne : INetworkMessage, INetworkSerializeByMemcpy
+        private struct TestMessageOne : INetworkMessage
         {
             public int A;
             public int B;
@@ -25,7 +25,7 @@ namespace Unity.Netcode.EditorTests
             }
         }
 
-        private struct TestMessageTwo : INetworkMessage, INetworkSerializeByMemcpy
+        private struct TestMessageTwo : INetworkMessage
         {
             public int A;
             public int B;
@@ -64,7 +64,7 @@ namespace Unity.Netcode.EditorTests
             }
         }
 
-        private struct TestMessageThree : INetworkMessage, INetworkSerializeByMemcpy
+        private struct TestMessageThree : INetworkMessage
         {
             public int A;
             public int B;
@@ -97,7 +97,7 @@ namespace Unity.Netcode.EditorTests
                 };
             }
         }
-        private struct TestMessageFour : INetworkMessage, INetworkSerializeByMemcpy
+        private struct TestMessageFour : INetworkMessage
         {
             public int A;
             public int B;
@@ -172,6 +172,8 @@ namespace Unity.Netcode.EditorTests
                 MessagingSystem.MessageHandler handlerTwo = MessagingSystem.ReceiveMessage<TestMessageTwo>;
                 MessagingSystem.MessageHandler handlerThree = MessagingSystem.ReceiveMessage<TestMessageThree>;
                 MessagingSystem.MessageHandler handlerFour = MessagingSystem.ReceiveMessage<TestMessageFour>;
+
+                var foundHandlerOne = systemOne.MessageHandlers[systemOne.GetMessageType(typeof(TestMessageOne))];
 
                 Assert.AreEqual(handlerOne, systemOne.MessageHandlers[systemOne.GetMessageType(typeof(TestMessageOne))]);
                 Assert.AreEqual(handlerTwo, systemOne.MessageHandlers[systemOne.GetMessageType(typeof(TestMessageTwo))]);

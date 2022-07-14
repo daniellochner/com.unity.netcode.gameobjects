@@ -3,7 +3,7 @@ namespace Unity.Netcode
     /// <summary>
     /// This is the header data that's serialized to the network when sending an <see cref="INetworkMessage"/>
     /// </summary>
-    internal struct MessageHeader : INetworkSerializeByMemcpy
+    internal struct MessageHeader
     {
         /// <summary>
         /// The byte representation of the message type. This is automatically assigned to each message

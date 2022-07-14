@@ -1,6 +1,6 @@
 namespace Unity.Netcode
 {
-    internal struct ChangeOwnershipMessage : INetworkMessage, INetworkSerializeByMemcpy
+    internal struct ChangeOwnershipMessage : INetworkMessage
     {
         public ulong NetworkObjectId;
         public ulong OwnerClientId;
@@ -20,7 +20,7 @@ namespace Unity.Netcode
             reader.ReadValueSafe(out this);
             if (!networkManager.SpawnManager.SpawnedObjects.ContainsKey(NetworkObjectId))
             {
-                networkManager.DeferredMessageManager.DeferMessage(IDeferredMessageManager.TriggerType.OnSpawn, NetworkObjectId, reader, ref context);
+                networkManager.SpawnManager.TriggerOnSpawn(NetworkObjectId, reader, ref context);
                 return false;
             }
 

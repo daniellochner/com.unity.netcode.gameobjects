@@ -19,7 +19,7 @@ namespace Unity.Netcode.RuntimeTests
         [UnityTest]
         public IEnumerator UnnamedMessageIsReceivedOnClientWithContent()
         {
-            var messageContent = new ForceNetworkSerializeByMemcpy<Guid>(Guid.NewGuid());
+            var messageContent = Guid.NewGuid();
             var writer = new FastBufferWriter(1300, Allocator.Temp);
             using (writer)
             {
@@ -30,7 +30,7 @@ namespace Unity.Netcode.RuntimeTests
             }
 
             ulong receivedMessageSender = 0;
-            var receivedMessageContent = new ForceNetworkSerializeByMemcpy<Guid>(new Guid());
+            var receivedMessageContent = new Guid();
             FirstClient.CustomMessagingManager.OnUnnamedMessage +=
                 (ulong sender, FastBufferReader reader) =>
                 {
@@ -41,14 +41,14 @@ namespace Unity.Netcode.RuntimeTests
 
             yield return new WaitForSeconds(0.2f);
 
-            Assert.AreEqual(messageContent.Value, receivedMessageContent.Value);
+            Assert.AreEqual(messageContent, receivedMessageContent);
             Assert.AreEqual(m_ServerNetworkManager.LocalClientId, receivedMessageSender);
         }
 
         [UnityTest]
         public IEnumerator UnnamedMessageIsReceivedOnMultipleClientsWithContent()
         {
-            var messageContent = new ForceNetworkSerializeByMemcpy<Guid>(Guid.NewGuid());
+            var messageContent = Guid.NewGuid();
             var writer = new FastBufferWriter(1300, Allocator.Temp);
             using (writer)
             {
@@ -59,7 +59,7 @@ namespace Unity.Netcode.RuntimeTests
             }
 
             ulong firstReceivedMessageSender = 0;
-            var firstReceivedMessageContent = new ForceNetworkSerializeByMemcpy<Guid>(new Guid());
+            var firstReceivedMessageContent = new Guid();
             FirstClient.CustomMessagingManager.OnUnnamedMessage +=
                 (ulong sender, FastBufferReader reader) =>
                 {
@@ -69,7 +69,7 @@ namespace Unity.Netcode.RuntimeTests
                 };
 
             ulong secondReceivedMessageSender = 0;
-            var secondReceivedMessageContent = new ForceNetworkSerializeByMemcpy<Guid>(new Guid());
+            var secondReceivedMessageContent = new Guid();
             SecondClient.CustomMessagingManager.OnUnnamedMessage +=
                 (ulong sender, FastBufferReader reader) =>
                 {
@@ -80,17 +80,17 @@ namespace Unity.Netcode.RuntimeTests
 
             yield return new WaitForSeconds(0.2f);
 
-            Assert.AreEqual(messageContent.Value, firstReceivedMessageContent.Value);
+            Assert.AreEqual(messageContent, firstReceivedMessageContent);
             Assert.AreEqual(m_ServerNetworkManager.LocalClientId, firstReceivedMessageSender);
 
-            Assert.AreEqual(messageContent.Value, secondReceivedMessageContent.Value);
+            Assert.AreEqual(messageContent, secondReceivedMessageContent);
             Assert.AreEqual(m_ServerNetworkManager.LocalClientId, secondReceivedMessageSender);
         }
 
         [UnityTest]
         public IEnumerator WhenSendingUnnamedMessageToAll_AllClientsReceiveIt()
         {
-            var messageContent = new ForceNetworkSerializeByMemcpy<Guid>(Guid.NewGuid());
+            var messageContent = Guid.NewGuid();
             var writer = new FastBufferWriter(1300, Allocator.Temp);
             using (writer)
             {
@@ -99,7 +99,7 @@ namespace Unity.Netcode.RuntimeTests
             }
 
             ulong firstReceivedMessageSender = 0;
-            var firstReceivedMessageContent = new ForceNetworkSerializeByMemcpy<Guid>(new Guid());
+            var firstReceivedMessageContent = new Guid();
             FirstClient.CustomMessagingManager.OnUnnamedMessage +=
                 (ulong sender, FastBufferReader reader) =>
                 {
@@ -109,7 +109,7 @@ namespace Unity.Netcode.RuntimeTests
                 };
 
             ulong secondReceivedMessageSender = 0;
-            var secondReceivedMessageContent = new ForceNetworkSerializeByMemcpy<Guid>(new Guid());
+            var secondReceivedMessageContent = new Guid();
             SecondClient.CustomMessagingManager.OnUnnamedMessage +=
                 (ulong sender, FastBufferReader reader) =>
                 {
@@ -120,17 +120,17 @@ namespace Unity.Netcode.RuntimeTests
 
             yield return new WaitForSeconds(0.2f);
 
-            Assert.AreEqual(messageContent.Value, firstReceivedMessageContent.Value);
+            Assert.AreEqual(messageContent, firstReceivedMessageContent);
             Assert.AreEqual(m_ServerNetworkManager.LocalClientId, firstReceivedMessageSender);
 
-            Assert.AreEqual(messageContent.Value, secondReceivedMessageContent.Value);
+            Assert.AreEqual(messageContent, secondReceivedMessageContent);
             Assert.AreEqual(m_ServerNetworkManager.LocalClientId, secondReceivedMessageSender);
         }
 
         [Test]
         public void WhenSendingNamedMessageToNullClientList_ArgumentNullExceptionIsThrown()
         {
-            var messageContent = new ForceNetworkSerializeByMemcpy<Guid>(Guid.NewGuid());
+            var messageContent = Guid.NewGuid();
             var writer = new FastBufferWriter(1300, Allocator.Temp);
             using (writer)
             {

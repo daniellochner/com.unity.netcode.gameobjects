@@ -2,10 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
-using Unity.Collections;
 using UnityEngine.TestTools;
 using Unity.Netcode.TestHelpers.Runtime;
-using UnityEngine;
 using Debug = UnityEngine.Debug;
 
 namespace Unity.Netcode.RuntimeTests
@@ -15,7 +13,6 @@ namespace Unity.Netcode.RuntimeTests
         public class RpcTestNB : NetworkBehaviour
         {
             public event Action<ulong, ServerRpcParams> OnServer_Rpc;
-            public event Action<Vector3, Vector3[], FixedString32Bytes> OnTypedServer_Rpc;
             public event Action OnClient_Rpc;
 
             [ServerRpc]
@@ -28,12 +25,6 @@ namespace Unity.Netcode.RuntimeTests
             public void MyClientRpc()
             {
                 OnClient_Rpc();
-            }
-
-            [ServerRpc]
-            public void MyTypedServerRpc(Vector3 param1, Vector3[] param2, FixedString32Bytes param3)
-            {
-                OnTypedServer_Rpc(param1, param2, param3);
             }
         }
 
@@ -55,12 +46,8 @@ namespace Unity.Netcode.RuntimeTests
 
             // Setup state
             bool hasReceivedServerRpc = false;
-            bool hasReceivedTypedServerRpc = false;
             bool hasReceivedClientRpcRemotely = false;
             bool hasReceivedClientRpcLocally = false;
-
-            var vector3 = new Vector3(1, 2, 3);
-            Vector3[] vector3s = new[] { new Vector3(4, 5, 6), new Vector3(7, 8, 9) };
 
             localClienRpcTestNB.OnClient_Rpc += () =>
             {
@@ -88,24 +75,8 @@ namespace Unity.Netcode.RuntimeTests
                 hasReceivedClientRpcLocally = true;
             };
 
-            var str = new FixedString32Bytes("abcdefg");
-
-            serverClientRpcTestNB.OnTypedServer_Rpc += (param1, param2, param3) =>
-            {
-                Debug.Log("TypedServerRpc received on server object");
-                Assert.AreEqual(param1, vector3);
-                Assert.AreEqual(param2.Length, vector3s.Length);
-                Assert.AreEqual(param2[0], vector3s[0]);
-                Assert.AreEqual(param2[1], vector3s[1]);
-                Assert.AreEqual(param3, str);
-                hasReceivedTypedServerRpc = true;
-            };
-
             // Send ServerRpc
             localClienRpcTestNB.MyServerRpc(m_ClientNetworkManagers[0].LocalClientId);
-
-            // Send TypedServerRpc
-            localClienRpcTestNB.MyTypedServerRpc(vector3, vector3s, str);
 
             // Send ClientRpc
             serverClientRpcTestNB.MyClientRpc();
@@ -115,11 +86,6 @@ namespace Unity.Netcode.RuntimeTests
             var serverMessageHookEntry = new MessageHookEntry(m_ServerNetworkManager);
             serverMessageHookEntry.AssignMessageType<ServerRpcMessage>();
             messageHookList.Add(serverMessageHookEntry);
-
-            var typedServerMessageHookEntry = new MessageHookEntry(m_ServerNetworkManager);
-            typedServerMessageHookEntry.AssignMessageType<ServerRpcMessage>();
-            messageHookList.Add(typedServerMessageHookEntry);
-
             foreach (var client in m_ClientNetworkManagers)
             {
                 var clientMessageHookEntry = new MessageHookEntry(client);
@@ -131,10 +97,9 @@ namespace Unity.Netcode.RuntimeTests
             Assert.False(s_GlobalTimeoutHelper.TimedOut, $"Timed out waiting for messages: {rpcMessageHooks.GetHooksStillWaiting()}");
 
             // Make sure RPCs propagated all the way up and were called on the relative destination class instance
-            yield return WaitForConditionOrTimeOut(() => hasReceivedServerRpc && hasReceivedClientRpcLocally && hasReceivedClientRpcRemotely && hasReceivedTypedServerRpc);
+            yield return WaitForConditionOrTimeOut(() => hasReceivedServerRpc && hasReceivedClientRpcLocally && hasReceivedClientRpcRemotely);
 
             Assert.True(hasReceivedServerRpc, "ServerRpc was not received");
-            Assert.True(hasReceivedTypedServerRpc, "TypedServerRpc was not received");
             Assert.True(hasReceivedClientRpcLocally, "ClientRpc was not locally received on the server");
             Assert.True(hasReceivedClientRpcRemotely, "ClientRpc was not remotely received on the client");
         }

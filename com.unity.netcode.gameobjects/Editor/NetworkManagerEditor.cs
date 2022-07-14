@@ -6,10 +6,6 @@ using UnityEditorInternal;
 
 namespace Unity.Netcode.Editor
 {
-    /// <summary>
-    /// This <see cref="CustomEditor"/> handles the translation between the <see cref="NetworkConfig"/> and
-    /// the <see cref="NetworkManager"/> properties.
-    /// </summary>
     [CustomEditor(typeof(NetworkManager), true)]
     [CanEditMultipleObjects]
     public class NetworkManagerEditor : UnityEditor.Editor
@@ -204,7 +200,6 @@ namespace Unity.Netcode.Editor
             m_NetworkPrefabsList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "NetworkPrefabs");
         }
 
-        /// <inheritdoc/>
         public override void OnInspectorGUI()
         {
             Initialize();
@@ -368,7 +363,7 @@ namespace Unity.Netcode.Editor
             const string getToolsText = "Access additional tools for multiplayer development by installing the Multiplayer Tools package in the Package Manager.";
             const string openDocsButtonText = "Open Docs";
             const string dismissButtonText = "Dismiss";
-            const string targetUrl = "https://docs-multiplayer.unity3d.com/netcode/current/tools/install-tools";
+            const string targetUrl = "https://docs-multiplayer.unity3d.com/docs/tools/install-tools";
             const string infoIconName = "console.infoicon";
 
             if (PlayerPrefs.GetInt(InstallMultiplayerToolsTipDismissedPlayerPrefKey, 0) != 0)

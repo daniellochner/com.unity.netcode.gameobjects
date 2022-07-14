@@ -91,10 +91,8 @@ namespace Unity.Netcode
         /// </summary>
         /// <param name="senderId">The source clientId</param>
         /// <param name="messageType">The type of the message</param>
-        /// <param name="messageContent">The FastBufferReader containing the message</param>
-        /// <param name="context">The NetworkContext the message is being processed in</param>
         /// <returns></returns>
-        bool OnVerifyCanReceive(ulong senderId, Type messageType, FastBufferReader messageContent, ref NetworkContext context);
+        bool OnVerifyCanReceive(ulong senderId, Type messageType);
 
         /// <summary>
         /// Called after a message is serialized, but before it's handled.

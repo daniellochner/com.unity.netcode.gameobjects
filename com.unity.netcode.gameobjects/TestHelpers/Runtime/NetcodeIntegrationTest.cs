@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using System.Runtime.CompilerServices;
 
@@ -17,12 +16,7 @@ namespace Unity.Netcode.TestHelpers.Runtime
     /// </summary>
     public abstract class NetcodeIntegrationTest
     {
-        /// <summary>
-        /// Used to determine if a NetcodeIntegrationTest is currently running to
-        /// determine how clients will load scenes
-        /// </summary>
-        internal static bool IsRunning { get; private set; }
-        protected static TimeoutHelper s_GlobalTimeoutHelper = new TimeoutHelper(8.0f);
+        protected static TimeoutHelper s_GlobalTimeoutHelper = new TimeoutHelper(4.0f);
         protected static WaitForSeconds s_DefaultWaitForTick = new WaitForSeconds(1.0f / k_DefaultTickRate);
 
         /// <summary>
@@ -80,21 +74,10 @@ namespace Unity.Netcode.TestHelpers.Runtime
             }
         }
 
-        protected int TotalClients => m_UseHost ? m_NumberOfClients + 1 : m_NumberOfClients;
+        protected int TotalClients => m_UseHost ? NumberOfClients + 1 : NumberOfClients;
 
         protected const uint k_DefaultTickRate = 30;
-
-        private int m_NumberOfClients;
         protected abstract int NumberOfClients { get; }
-
-        /// <summary>
-        /// Set this to false to create the clients first.
-        /// Note: If you are using scene placed NetworkObjects or doing any form of scene testing and
-        /// get prefab hash id "soft synchronization" errors, then set this to false and run your test
-        /// again.  This is a work-around until we can resolve some issues with NetworkManagerOwner and
-        /// NetworkManager.Singleton.
-        /// </summary>
-        protected bool m_CreateServerFirst = true;
 
         public enum NetworkManagerInstatiationMode
         {
@@ -125,9 +108,11 @@ namespace Unity.Netcode.TestHelpers.Runtime
         protected bool m_UseHost = true;
         protected int m_TargetFrameRate = 60;
 
+        protected NetcodeIntegrationTestHelpers.InstanceTransport m_NetworkTransport = NetcodeIntegrationTestHelpers.InstanceTransport.SIP;
+
         private NetworkManagerInstatiationMode m_NetworkManagerInstatiationMode;
 
-        protected bool m_EnableVerboseDebug { get; set; }
+        private bool m_EnableVerboseDebug;
 
         /// <summary>
         /// Used to display the various integration test
@@ -173,11 +158,8 @@ namespace Unity.Netcode.TestHelpers.Runtime
         [OneTimeSetUp]
         public void OneTimeSetup()
         {
-            Application.runInBackground = true;
-            m_NumberOfClients = NumberOfClients;
-            IsRunning = true;
             m_EnableVerboseDebug = OnSetVerboseDebug();
-            IntegrationTestSceneHandler.VerboseDebugMode = m_EnableVerboseDebug;
+
             VerboseDebug($"Entering {nameof(OneTimeSetup)}");
 
             m_NetworkManagerInstatiationMode = OnSetIntegrationTestMode();
@@ -259,61 +241,6 @@ namespace Unity.Netcode.TestHelpers.Runtime
             CreateServerAndClients(NumberOfClients);
         }
 
-        protected virtual void OnNewClientCreated(NetworkManager networkManager)
-        {
-
-        }
-
-        protected virtual void OnNewClientStartedAndConnected(NetworkManager networkManager)
-        {
-
-        }
-
-        private void AddRemoveNetworkManager(NetworkManager networkManager, bool addNetworkManager)
-        {
-            var clientNetworkManagersList = new List<NetworkManager>(m_ClientNetworkManagers);
-            if (addNetworkManager)
-            {
-                clientNetworkManagersList.Add(networkManager);
-            }
-            else
-            {
-                clientNetworkManagersList.Remove(networkManager);
-            }
-            m_ClientNetworkManagers = clientNetworkManagersList.ToArray();
-            m_NumberOfClients = clientNetworkManagersList.Count;
-        }
-
-        protected IEnumerator CreateAndStartNewClient()
-        {
-            var networkManager = NetcodeIntegrationTestHelpers.CreateNewClient(m_ClientNetworkManagers.Length);
-            networkManager.NetworkConfig.PlayerPrefab = m_PlayerPrefab;
-
-            // Notification that the new client (NetworkManager) has been created
-            // in the event any modifications need to be made before starting the client
-            OnNewClientCreated(networkManager);
-
-            NetcodeIntegrationTestHelpers.StartOneClient(networkManager);
-            AddRemoveNetworkManager(networkManager, true);
-            // Wait for the new client to connect
-            yield return WaitForClientsConnectedOrTimeOut();
-            if (s_GlobalTimeoutHelper.TimedOut)
-            {
-                AddRemoveNetworkManager(networkManager, false);
-                Object.Destroy(networkManager.gameObject);
-            }
-            AssertOnTimeout($"{nameof(CreateAndStartNewClient)} timed out waiting for the new client to be connected!");
-            ClientNetworkManagerPostStart(networkManager);
-            VerboseDebug($"[{networkManager.name}] Created and connected!");
-        }
-
-        protected IEnumerator StopOneClient(NetworkManager networkManager, bool destroy = false)
-        {
-            NetcodeIntegrationTestHelpers.StopOneClient(networkManager, destroy);
-            AddRemoveNetworkManager(networkManager, false);
-            yield return WaitForConditionOrTimeOut(() => !networkManager.IsConnectedClient);
-        }
-
         /// <summary>
         /// Creates the server and clients
         /// </summary>
@@ -325,7 +252,7 @@ namespace Unity.Netcode.TestHelpers.Runtime
             CreatePlayerPrefab();
 
             // Create multiple NetworkManager instances
-            if (!NetcodeIntegrationTestHelpers.Create(numberOfClients, out NetworkManager server, out NetworkManager[] clients, m_TargetFrameRate, m_CreateServerFirst))
+            if (!NetcodeIntegrationTestHelpers.Create(numberOfClients, out NetworkManager server, out NetworkManager[] clients, m_TargetFrameRate, m_NetworkTransport))
             {
                 Debug.LogError("Failed to create instances");
                 Assert.Fail("Failed to create instances");
@@ -381,54 +308,6 @@ namespace Unity.Netcode.TestHelpers.Runtime
             yield return null;
         }
 
-        private void ClientNetworkManagerPostStart(NetworkManager networkManager)
-        {
-            networkManager.name = $"NetworkManager - Client - {networkManager.LocalClientId}";
-            Assert.NotNull(networkManager.LocalClient.PlayerObject, $"{nameof(StartServerAndClients)} detected that client {networkManager.LocalClientId} does not have an assigned player NetworkObject!");
-
-            // Get all player instances for the current client NetworkManager instance
-            var clientPlayerClones = Object.FindObjectsOfType<NetworkObject>().Where((c) => c.IsPlayerObject && c.OwnerClientId == networkManager.LocalClientId);
-            // Add this player instance to each client player entry
-            foreach (var playerNetworkObject in clientPlayerClones)
-            {
-                // When the server is not the host this needs to be done
-                if (!m_PlayerNetworkObjects.ContainsKey(playerNetworkObject.NetworkManager.LocalClientId))
-                {
-                    m_PlayerNetworkObjects.Add(playerNetworkObject.NetworkManager.LocalClientId, new Dictionary<ulong, NetworkObject>());
-                }
-                if (!m_PlayerNetworkObjects[playerNetworkObject.NetworkManager.LocalClientId].ContainsKey(networkManager.LocalClientId))
-                {
-                    m_PlayerNetworkObjects[playerNetworkObject.NetworkManager.LocalClientId].Add(networkManager.LocalClientId, playerNetworkObject);
-                }
-            }
-        }
-
-        protected void ClientNetworkManagerPostStartInit()
-        {
-            // Creates a dictionary for all player instances client and server relative
-            // This provides a simpler way to get a specific player instance relative to a client instance
-            foreach (var networkManager in m_ClientNetworkManagers)
-            {
-                ClientNetworkManagerPostStart(networkManager);
-            }
-            if (m_UseHost)
-            {
-                var clientSideServerPlayerClones = Object.FindObjectsOfType<NetworkObject>().Where((c) => c.IsPlayerObject && c.OwnerClientId == m_ServerNetworkManager.LocalClientId);
-                foreach (var playerNetworkObject in clientSideServerPlayerClones)
-                {
-                    // When the server is not the host this needs to be done
-                    if (!m_PlayerNetworkObjects.ContainsKey(playerNetworkObject.NetworkManager.LocalClientId))
-                    {
-                        m_PlayerNetworkObjects.Add(playerNetworkObject.NetworkManager.LocalClientId, new Dictionary<ulong, NetworkObject>());
-                    }
-                    if (!m_PlayerNetworkObjects[playerNetworkObject.NetworkManager.LocalClientId].ContainsKey(m_ServerNetworkManager.LocalClientId))
-                    {
-                        m_PlayerNetworkObjects[playerNetworkObject.NetworkManager.LocalClientId].Add(m_ServerNetworkManager.LocalClientId, playerNetworkObject);
-                    }
-                }
-            }
-        }
-
         /// <summary>
         /// This starts the server and clients as long as <see cref="CanStartServerAndClients"/>
         /// returns true.
@@ -454,7 +333,8 @@ namespace Unity.Netcode.TestHelpers.Runtime
 
                 // Wait for all clients to connect
                 yield return WaitForClientsConnectedOrTimeOut();
-                AssertOnTimeout($"{nameof(StartServerAndClients)} timed out waiting for all clients to be connected!");
+
+                Assert.False(s_GlobalTimeoutHelper.TimedOut, $"{nameof(StartServerAndClients)} timed out waiting for all clients to be connected!");
 
                 if (m_UseHost || m_ServerNetworkManager.IsHost)
                 {
@@ -470,7 +350,25 @@ namespace Unity.Netcode.TestHelpers.Runtime
                     }
                 }
 
-                ClientNetworkManagerPostStartInit();
+                // Creates a dictionary for all player instances client and server relative
+                // This provides a simpler way to get a specific player instance relative to a client instance
+                foreach (var networkManager in m_ClientNetworkManagers)
+                {
+                    Assert.NotNull(networkManager.LocalClient.PlayerObject, $"{nameof(StartServerAndClients)} detected that client {networkManager.LocalClientId} does not have an assigned player NetworkObject!");
+
+                    // Get all player instances for the current client NetworkManager instance
+                    var clientPlayerClones = Object.FindObjectsOfType<NetworkObject>().Where((c) => c.IsPlayerObject && c.OwnerClientId == networkManager.LocalClientId);
+                    // Add this player instance to each client player entry
+                    foreach (var playerNetworkObject in clientPlayerClones)
+                    {
+                        // When the server is not the host this needs to be done
+                        if (!m_PlayerNetworkObjects.ContainsKey(playerNetworkObject.NetworkManager.LocalClientId))
+                        {
+                            m_PlayerNetworkObjects.Add(playerNetworkObject.NetworkManager.LocalClientId, new Dictionary<ulong, NetworkObject>());
+                        }
+                        m_PlayerNetworkObjects[playerNetworkObject.NetworkManager.LocalClientId].Add(networkManager.LocalClientId, playerNetworkObject);
+                    }
+                }
 
                 // Notification that at this time the server and client(s) are instantiated,
                 // started, and connected on both sides.
@@ -504,9 +402,11 @@ namespace Unity.Netcode.TestHelpers.Runtime
         /// </summary>
         protected void DeRegisterSceneManagerHandler()
         {
-            IntegrationTestSceneHandler.CanClientsLoad -= ClientSceneHandler_CanClientsLoad;
-            IntegrationTestSceneHandler.CanClientsUnload -= ClientSceneHandler_CanClientsUnload;
-            IntegrationTestSceneHandler.NetworkManagers.Clear();
+            if (NetcodeIntegrationTestHelpers.ClientSceneHandler != null)
+            {
+                NetcodeIntegrationTestHelpers.ClientSceneHandler.CanClientsLoad -= ClientSceneHandler_CanClientsLoad;
+                NetcodeIntegrationTestHelpers.ClientSceneHandler.CanClientsUnload -= ClientSceneHandler_CanClientsUnload;
+            }
         }
 
         /// <summary>
@@ -516,9 +416,11 @@ namespace Unity.Netcode.TestHelpers.Runtime
         /// </summary>
         protected void RegisterSceneManagerHandler()
         {
-            IntegrationTestSceneHandler.CanClientsLoad += ClientSceneHandler_CanClientsLoad;
-            IntegrationTestSceneHandler.CanClientsUnload += ClientSceneHandler_CanClientsUnload;
-            NetcodeIntegrationTestHelpers.RegisterSceneManagerHandler(m_ServerNetworkManager, true);
+            if (NetcodeIntegrationTestHelpers.ClientSceneHandler != null)
+            {
+                NetcodeIntegrationTestHelpers.ClientSceneHandler.CanClientsLoad += ClientSceneHandler_CanClientsLoad;
+                NetcodeIntegrationTestHelpers.ClientSceneHandler.CanClientsUnload += ClientSceneHandler_CanClientsUnload;
+            }
         }
 
         private bool ClientSceneHandler_CanClientsUnload()
@@ -529,11 +431,6 @@ namespace Unity.Netcode.TestHelpers.Runtime
         private bool ClientSceneHandler_CanClientsLoad()
         {
             return CanClientsLoad();
-        }
-
-        protected bool OnCanSceneCleanUpUnload(Scene scene)
-        {
-            return true;
         }
 
         /// <summary>
@@ -548,7 +445,11 @@ namespace Unity.Netcode.TestHelpers.Runtime
             // Shutdown and clean up both of our NetworkManager instances
             try
             {
-                DeRegisterSceneManagerHandler();
+                if (NetcodeIntegrationTestHelpers.ClientSceneHandler != null)
+                {
+                    NetcodeIntegrationTestHelpers.ClientSceneHandler.CanClientsLoad -= ClientSceneHandler_CanClientsLoad;
+                    NetcodeIntegrationTestHelpers.ClientSceneHandler.CanClientsUnload -= ClientSceneHandler_CanClientsUnload;
+                }
 
                 NetcodeIntegrationTestHelpers.Destroy();
 
@@ -567,8 +468,6 @@ namespace Unity.Netcode.TestHelpers.Runtime
 
             // Cleanup any remaining NetworkObjects
             DestroySceneNetworkObjects();
-
-            UnloadRemainingScenes();
 
             // reset the m_ServerWaitForTick for the next test to initialize
             s_DefaultWaitForTick = new WaitForSeconds(1.0f / k_DefaultTickRate);
@@ -611,7 +510,6 @@ namespace Unity.Netcode.TestHelpers.Runtime
         [OneTimeTearDown]
         public void OneTimeTearDown()
         {
-            IntegrationTestSceneHandler.VerboseDebugMode = false;
             VerboseDebug($"Entering {nameof(OneTimeTearDown)}");
             OnOneTimeTearDown();
 
@@ -623,11 +521,7 @@ namespace Unity.Netcode.TestHelpers.Runtime
             // Disable NetcodeIntegrationTest auto-label feature
             NetcodeIntegrationTestHelpers.RegisterNetcodeIntegrationTest(false);
 
-            UnloadRemainingScenes();
-
             VerboseDebug($"Exiting {nameof(OneTimeTearDown)}");
-
-            IsRunning = false;
         }
 
         /// <summary>
@@ -664,7 +558,6 @@ namespace Unity.Netcode.TestHelpers.Runtime
                 }
                 if (CanDestroyNetworkObject(networkObject))
                 {
-                    networkObject.NetworkManagerOwner = m_ServerNetworkManager;
                     // Destroy the GameObject that holds the NetworkObject component
                     Object.DestroyImmediate(networkObject.gameObject);
                 }
@@ -775,7 +668,6 @@ namespace Unity.Netcode.TestHelpers.Runtime
             var gameObject = new GameObject();
             gameObject.name = baseName;
             var networkObject = gameObject.AddComponent<NetworkObject>();
-            networkObject.NetworkManagerOwner = m_ServerNetworkManager;
             NetcodeIntegrationTestHelpers.MakeNetworkObjectTestPrefab(networkObject);
             var networkPrefab = new NetworkPrefab() { Prefab = gameObject };
             m_ServerNetworkManager.NetworkConfig.NetworkPrefabs.Add(networkPrefab);
@@ -881,33 +773,6 @@ namespace Unity.Netcode.TestHelpers.Runtime
         public NetcodeIntegrationTest(HostOrServer hostOrServer)
         {
             m_UseHost = hostOrServer == HostOrServer.Host ? true : false;
-        }
-
-        /// <summary>
-        /// Just a helper function to avoid having to write the entire assert just to check if you
-        /// timed out.
-        /// </summary>
-        protected void AssertOnTimeout(string timeOutErrorMessage, TimeoutHelper assignedTimeoutHelper = null)
-        {
-            var timeoutHelper = assignedTimeoutHelper != null ? assignedTimeoutHelper : s_GlobalTimeoutHelper;
-            Assert.False(timeoutHelper.TimedOut, timeOutErrorMessage);
-        }
-
-        private void UnloadRemainingScenes()
-        {
-            // Unload any remaining scenes loaded but the test runner scene
-            // Note: Some tests only unload the server-side instance, and this
-            // just assures no currently loaded scenes will impact the next test
-            for (int i = 0; i < SceneManager.sceneCount; i++)
-            {
-                var scene = SceneManager.GetSceneAt(i);
-                if (!scene.IsValid() || !scene.isLoaded || scene.name.Contains(NetcodeIntegrationTestHelpers.FirstPartOfTestRunnerSceneName) || !OnCanSceneCleanUpUnload(scene))
-                {
-                    continue;
-                }
-                VerboseDebug($"Unloading scene {scene.name}-{scene.handle}");
-                var asyncOperation = SceneManager.UnloadSceneAsync(scene);
-            }
         }
     }
 }

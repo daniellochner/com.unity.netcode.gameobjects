@@ -91,8 +91,6 @@ namespace Unity.Netcode.RuntimeTests
             Assert.AreEqual(clientSideClientId, clientSideClientPlayerObject.OwnerClientId);
         }
 
-        private bool m_ClientDisconnected;
-
         [UnityTest]
         public IEnumerator TestConnectAndDisconnect()
         {
@@ -122,22 +120,11 @@ namespace Unity.Netcode.RuntimeTests
 
             // test when client disconnects, player object no longer available.
             var nbConnectedClients = m_ServerNetworkManager.ConnectedClients.Count;
-            m_ClientDisconnected = false;
-            newClientNetworkManager.OnClientDisconnectCallback += ClientNetworkManager_OnClientDisconnectCallback;
-            m_ServerNetworkManager.DisconnectClient(newClientLocalClientId);
-            yield return WaitForConditionOrTimeOut(() => m_ClientDisconnected);
-            Assert.IsFalse(s_GlobalTimeoutHelper.TimedOut, "Timed out waiting for client to disconnect");
-            // Call this to clean up NetcodeIntegrationTestHelpers
             NetcodeIntegrationTestHelpers.StopOneClient(newClientNetworkManager);
+            yield return WaitForConditionOrTimeOut(() => m_ServerNetworkManager.ConnectedClients.Count == nbConnectedClients - 1);
 
-            Assert.AreEqual(m_ServerNetworkManager.ConnectedClients.Count, nbConnectedClients - 1);
             serverSideNewClientPlayer = m_ServerNetworkManager.SpawnManager.GetPlayerNetworkObject(newClientLocalClientId);
             Assert.Null(serverSideNewClientPlayer);
-        }
-
-        private void ClientNetworkManager_OnClientDisconnectCallback(ulong obj)
-        {
-            m_ClientDisconnected = true;
         }
     }
 }

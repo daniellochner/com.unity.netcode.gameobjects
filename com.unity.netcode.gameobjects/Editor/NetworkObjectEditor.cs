@@ -4,9 +4,6 @@ using UnityEditor;
 
 namespace Unity.Netcode.Editor
 {
-    /// <summary>
-    /// The <see cref="CustomEditor"/> for <see cref="NetworkObject"/>
-    /// </summary>
     [CustomEditor(typeof(NetworkObject), true)]
     [CanEditMultipleObjects]
     public class NetworkObjectEditor : UnityEditor.Editor
@@ -26,7 +23,6 @@ namespace Unity.Netcode.Editor
             m_NetworkObject = (NetworkObject)target;
         }
 
-        /// <inheritdoc/>
         public override void OnInspectorGUI()
         {
             Initialize();

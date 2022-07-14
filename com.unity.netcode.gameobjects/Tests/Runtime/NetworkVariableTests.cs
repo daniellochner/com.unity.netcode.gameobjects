@@ -271,14 +271,7 @@ namespace Unity.Netcode.RuntimeTests
 
     public class NetworkVariableTest : NetworkBehaviour
     {
-        public enum SomeEnum
-        {
-            A,
-            B,
-            C
-        }
         public readonly NetworkVariable<int> TheScalar = new NetworkVariable<int>();
-        public readonly NetworkVariable<SomeEnum> TheEnum = new NetworkVariable<SomeEnum>();
         public readonly NetworkList<int> TheList = new NetworkList<int>();
         public readonly NetworkList<FixedString128Bytes> TheLargeList = new NetworkList<FixedString128Bytes>();
 
@@ -313,8 +306,7 @@ namespace Unity.Netcode.RuntimeTests
     [TestFixture(false)]
     public class NetworkVariableTests : NetcodeIntegrationTest
     {
-        private const string k_StringTestValue = "abcdefghijklmnopqrstuvwxyz";
-        private static readonly FixedString32Bytes k_FixedStringTestValue = k_StringTestValue;
+        private const string k_FixedStringTestValue = "abcdefghijklmnopqrstuvwxyz";
         protected override int NumberOfClients => 2;
 
         private const uint k_TestUInt = 0x12345678;
@@ -372,7 +364,6 @@ namespace Unity.Netcode.RuntimeTests
 
             // Wait for connection on client and server side
             yield return WaitForClientsConnectedOrTimeOut();
-            AssertOnTimeout($"Timed-out waiting for all clients to connect!");
 
             // These are the *SERVER VERSIONS* of the *CLIENT PLAYER 1 & 2*
             var result = new NetcodeIntegrationTestHelpers.ResultWrapper<NetworkObject>();
@@ -605,28 +596,11 @@ namespace Unity.Netcode.RuntimeTests
             bool VerifyStructure()
             {
                 return m_Player1OnClient1.TheStruct.Value.SomeBool == m_Player1OnServer.TheStruct.Value.SomeBool &&
-                       m_Player1OnClient1.TheStruct.Value.SomeInt == m_Player1OnServer.TheStruct.Value.SomeInt;
+                    m_Player1OnClient1.TheStruct.Value.SomeInt == m_Player1OnServer.TheStruct.Value.SomeInt;
             }
 
             m_Player1OnServer.TheStruct.Value = new TestStruct() { SomeInt = k_TestUInt, SomeBool = false };
             m_Player1OnServer.TheStruct.SetDirty(true);
-
-            // Wait for the client-side to notify it is finished initializing and spawning.
-            yield return WaitForConditionOrTimeOut(VerifyStructure);
-        }
-
-        [UnityTest]
-        public IEnumerator TestNetworkVariableEnum([Values(true, false)] bool useHost)
-        {
-            yield return InitializeServerAndClients(useHost);
-
-            bool VerifyStructure()
-            {
-                return m_Player1OnClient1.TheEnum.Value == NetworkVariableTest.SomeEnum.C;
-            }
-
-            m_Player1OnServer.TheEnum.Value = NetworkVariableTest.SomeEnum.C;
-            m_Player1OnServer.TheEnum.SetDirty(true);
 
             // Wait for the client-side to notify it is finished initializing and spawning.
             yield return WaitForConditionOrTimeOut(VerifyStructure);

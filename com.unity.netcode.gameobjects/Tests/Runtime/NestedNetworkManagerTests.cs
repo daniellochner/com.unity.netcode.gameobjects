@@ -1,7 +1,7 @@
 using UnityEngine;
 using NUnit.Framework;
 using UnityEngine.TestTools;
-using Unity.Netcode.Transports.UTP;
+using Unity.Netcode.TestHelpers.Runtime;
 using Object = UnityEngine.Object;
 
 namespace Unity.Netcode.RuntimeTests
@@ -14,9 +14,9 @@ namespace Unity.Netcode.RuntimeTests
             var parent = new GameObject("ParentObject");
             var networkManagerObject = new GameObject(nameof(CheckNestedNetworkManager));
 
-            var unityTransport = networkManagerObject.AddComponent<UnityTransport>();
+            var transport = networkManagerObject.AddComponent<SIPTransport>();
             var networkManager = networkManagerObject.AddComponent<NetworkManager>();
-            networkManager.NetworkConfig = new NetworkConfig() { NetworkTransport = unityTransport };
+            networkManager.NetworkConfig = new NetworkConfig() { NetworkTransport = transport };
 
             // Make our NetworkManager's GameObject nested
             networkManagerObject.transform.parent = parent.transform;

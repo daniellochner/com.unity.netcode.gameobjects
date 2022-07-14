@@ -1,11 +1,34 @@
 {
-    "name": "com.unity.netcode.gameobjects",
-    "displayName": "Netcode for GameObjects",
-    "description": "Netcode for GameObjects is a high-level netcode SDK that provides networking capabilities to GameObject/MonoBehaviour workflows within Unity and sits on top of underlying transport layer.",
-    "version": "1.0.0",
-    "unity": "2020.3",
-    "dependencies": {
-        "com.unity.nuget.mono-cecil": "1.10.1",
-        "com.unity.transport": "1.1.0"
+  "name": "com.unity.netcode.gameobjects",
+  "displayName": "Netcode for GameObjects",
+  "description": "Netcode for GameObjects is a high-level netcode SDK that provides networking capabilities to GameObject/MonoBehaviour workflows within Unity and sits on top of underlying transport layer.",
+  "version": "1.0.0-pre.7",
+  "unity": "2020.3",
+  "dependencies": {
+    "com.unity.nuget.mono-cecil": "1.10.1",
+    "com.unity.transport": "1.0.0"
+  },
+  "upm": {
+    "changelog": "### Added\n\n- Added editor only check prior to entering into play mode if the currently open and active scene is in the build list and if not displays a dialog box asking the user if they would like to automatically add it prior to entering into play mode. (#1828)\n- Added `UnityTransport` implementation and `com.unity.transport` package dependency (#1823)\n- Added `NetworkVariableWritePermission` to `NetworkVariableBase` and implemented `Owner` client writable netvars. (#1762)\n- `UnityTransport` settings can now be set programmatically. (#1845)\n- `FastBufferWriter` and Reader IsInitialized property. (#1859)\n\n### Changed\n\n- Updated `UnityTransport` dependency on `com.unity.transport` to 1.0.0 (#1849)\n\n### Removed\n\n- Removed `SnapshotSystem` (#1852)\n- Removed `com.unity.modules.animation`, `com.unity.modules.physics` and `com.unity.modules.physics2d` dependencies from the package (#1812)\n- Removed `com.unity.collections` dependency from the package (#1849)\n\n### Fixed\n- Fixed in-scene placed NetworkObjects not being found/ignored after a client disconnects and then reconnects. (#1850)\n- Fixed issue where `UnityTransport` send queues were not flushed when calling `DisconnectLocalClient` or `DisconnectRemoteClient`. (#1847)\n- Fixed NetworkBehaviour dependency verification check for an existing NetworkObject not searching from root parent transform relative GameObject. (#1841)\n- Fixed issue where entries were not being removed from the NetworkSpawnManager.OwnershipToObjectsTable. (#1838)\n- Fixed ClientRpcs would always send to all connected clients by default as opposed to only sending to the NetworkObject's Observers list by default. (#1836)\n- Fixed clarity for NetworkSceneManager client side notification when it receives a scene hash value that does not exist in its local hash table. (#1828)\n- Fixed client throws a key not found exception when it times out using UNet or UTP. (#1821)\n- Fixed network variable updates are no longer limited to 32,768 bytes when NetworkConfig.EnsureNetworkVariableLengthSafety is enabled. The limits are now determined by what the transport can send in a message. (#1811)\n- Fixed in-scene NetworkObjects get destroyed if a client fails to connect and shuts down the NetworkManager. (#1809)\n- Fixed user never being notified in the editor that a NetworkBehaviour requires a NetworkObject to function properly. (#1808)\n- Fixed PlayerObjects and dynamically spawned NetworkObjects not being added to the NetworkClient's OwnedObjects (#1801)\n- Fixed issue where NetworkManager would continue starting even if the NetworkTransport selected failed. (#1780)\n- Fixed issue when spawning new player if an already existing player exists it does not remove IsPlayer from the previous player (#1779)\n- Fixed lack of notification that NetworkManager and NetworkObject cannot be added to the same GameObject with in-editor notifications (#1777)\n- Fixed parenting warning printing for false positives (#1855)"
+  },
+  "upmCi": {
+    "footprint": "98c91bebf56ec13b76dfa5cf9d5d22946f7529cd"
+  },
+  "repository": {
+    "url": "https://github.com/Unity-Technologies/com.unity.netcode.gameobjects.git",
+    "type": "git",
+    "revision": "16420648a7790c64f917e000f7d0cdbe57350835"
+  },
+  "samples": [
+    {
+      "displayName": "Bootstrap",
+      "description": "A lightweight sample to get started",
+      "path": "Samples~/Bootstrap"
+    },
+    {
+      "displayName": "ClientNetworkTransform",
+      "description": "A sample to demonstrate how client-driven NetworkTransform can be implemented",
+      "path": "Samples~/ClientNetworkTransform"
     }
+  ]
 }

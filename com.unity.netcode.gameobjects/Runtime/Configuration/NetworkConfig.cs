@@ -53,21 +53,9 @@ namespace Unity.Netcode
         public uint TickRate = 30;
 
         /// <summary>
-        /// The amount of seconds for the server to wait for the connection approval handshake to complete before the client is disconnected.
-        ///
-        /// If the timeout is reached before approval is completed the client will be disconnected.
+        /// The amount of seconds to wait for handshake to complete before timing out a client
         /// </summary>
-        /// <remarks>
-        /// The period begins after the <see cref="NetworkEvent.Connect"/> is received on the server.
-        /// The period ends once the server finishes processing a <see cref="ConnectionRequestMessage"/> from the client.
-        ///
-        /// This setting is independent of any Transport-level timeouts that may be in effect. It covers the time between
-        /// the connection being established on the Transport layer, the client sending a
-        /// <see cref="ConnectionRequestMessage"/>, and the server processing that message through <see cref="ConnectionApproval"/>.
-        ///
-        /// This setting is server-side only.
-        /// </remarks>
-        [Tooltip("The amount of seconds for the server to wait for the connection approval handshake to complete before the client is disconnected")]
+        [Tooltip("The amount of seconds to wait for the handshake to complete before the client times out")]
         public int ClientConnectionBufferTimeout = 10;
 
         /// <summary>
@@ -140,26 +128,18 @@ namespace Unity.Netcode
         public int LoadSceneTimeOut = 120;
 
         /// <summary>
-        /// The amount of time a message should be buffered if the asset or object needed to process it doesn't exist yet. If the asset is not added/object is not spawned within this time, it will be dropped.
+        /// The amount of time a message should be buffered for without being consumed. If it is not consumed within this time, it will be dropped.
         /// </summary>
-        [Tooltip("The amount of time a message should be buffered if the asset or object needed to process it doesn't exist yet. If the asset is not added/object is not spawned within this time, it will be dropped")]
-        public float SpawnTimeout = 1f;
+        [Tooltip("The amount of time a message should be buffered for without being consumed. If it is not consumed within this time, it will be dropped")]
+        public float MessageBufferTimeout = 20f;
 
         /// <summary>
         /// Whether or not to enable network logs.
         /// </summary>
         public bool EnableNetworkLogs = true;
 
-        /// <summary>
-        /// The number of RTT samples that is kept as an average for calculations
-        /// </summary>
         public const int RttAverageSamples = 5; // number of RTT to keep an average of (plus one)
-
-        /// <summary>
-        /// The number of slots used for RTT calculations. This is the maximum amount of in-flight messages
-        /// </summary>
         public const int RttWindowSize = 64; // number of slots to use for RTT computations (max number of in-flight packets)
-
         /// <summary>
         /// Returns a base64 encoded version of the configuration
         /// </summary>

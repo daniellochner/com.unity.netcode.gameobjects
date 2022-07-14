@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using NUnit.Framework;
-using Unity.Netcode.Transports.UTP;
 
 namespace Unity.Netcode.TestHelpers.Runtime
 {
@@ -68,7 +67,11 @@ namespace Unity.Netcode.TestHelpers.Runtime
 
                 Debug.Log($"{nameof(NetworkManager)} Instantiated.");
 
-                var unityTransport = NetworkManagerGameObject.AddComponent<UnityTransport>();
+                // NOTE: For now we only use SIPTransport for tests until UnityTransport
+                // has been verified working in nightly builds
+                // TODO-MTT-2486: Provide support for other transports once tested and verified
+                // working on consoles.
+                var sipTransport = NetworkManagerGameObject.AddComponent<SIPTransport>();
                 if (networkConfig == null)
                 {
                     networkConfig = new NetworkConfig
@@ -78,7 +81,7 @@ namespace Unity.Netcode.TestHelpers.Runtime
                 }
 
                 NetworkManagerObject.NetworkConfig = networkConfig;
-                NetworkManagerObject.NetworkConfig.NetworkTransport = unityTransport;
+                NetworkManagerObject.NetworkConfig.NetworkTransport = sipTransport;
 
                 // Starts the network manager in the mode specified
                 StartNetworkManagerMode(managerMode);

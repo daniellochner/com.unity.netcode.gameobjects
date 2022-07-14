@@ -30,7 +30,7 @@ namespace Unity.Netcode
             var networkManager = (NetworkManager)context.SystemOwner;
             if (!networkManager.SpawnManager.SpawnedObjects.ContainsKey(metadata.NetworkObjectId))
             {
-                networkManager.DeferredMessageManager.DeferMessage(IDeferredMessageManager.TriggerType.OnSpawn, metadata.NetworkObjectId, reader, ref context);
+                networkManager.SpawnManager.TriggerOnSpawn(metadata.NetworkObjectId, reader, ref context);
                 return false;
             }
 
@@ -83,7 +83,7 @@ namespace Unity.Netcode
         }
     }
 
-    internal struct RpcMetadata : INetworkSerializeByMemcpy
+    internal struct RpcMetadata
     {
         public ulong NetworkObjectId;
         public ushort NetworkBehaviourId;

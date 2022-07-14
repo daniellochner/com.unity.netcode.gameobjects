@@ -6,7 +6,6 @@ using System.Text;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
-using Unity.Collections;
 using Unity.CompilationPipeline.Common.Diagnostics;
 using Unity.CompilationPipeline.Common.ILPostProcessing;
 using UnityEngine;
@@ -28,8 +27,6 @@ namespace Unity.Netcode.Editor.CodeGen
         public static readonly string ServerRpcSendParams_FullName = typeof(ServerRpcSendParams).FullName;
         public static readonly string ServerRpcReceiveParams_FullName = typeof(ServerRpcReceiveParams).FullName;
         public static readonly string INetworkSerializable_FullName = typeof(INetworkSerializable).FullName;
-        public static readonly string INetworkSerializeByMemcpy_FullName = typeof(INetworkSerializeByMemcpy).FullName;
-        public static readonly string IUTF8Bytes_FullName = typeof(IUTF8Bytes).FullName;
         public static readonly string UnityColor_FullName = typeof(Color).FullName;
         public static readonly string UnityColor32_FullName = typeof(Color32).FullName;
         public static readonly string UnityVector2_FullName = typeof(Vector2).FullName;
@@ -78,35 +75,6 @@ namespace Unity.Netcode.Editor.CodeGen
             }
 
             return false;
-        }
-
-        public static string FullNameWithGenericParameters(this TypeReference typeReference, GenericParameter[] contextGenericParameters, TypeReference[] contextGenericParameterTypes)
-        {
-            var name = typeReference.FullName;
-            if (typeReference.HasGenericParameters)
-            {
-                name += "<";
-                for (var i = 0; i < typeReference.Resolve().GenericParameters.Count; ++i)
-                {
-                    if (i != 0)
-                    {
-                        name += ", ";
-                    }
-
-                    for (var j = 0; j < contextGenericParameters.Length; ++j)
-                    {
-                        if (typeReference.GenericParameters[i].FullName == contextGenericParameters[i].FullName)
-                        {
-                            name += contextGenericParameterTypes[i].FullName;
-                            break;
-                        }
-                    }
-                }
-
-                name += ">";
-            }
-
-            return name;
         }
 
         public static bool HasInterface(this TypeReference typeReference, string interfaceTypeFullName)

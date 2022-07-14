@@ -8,10 +8,56 @@ namespace Unity.Netcode
     /// <summary>
     /// A variable that can be synchronized over the network.
     /// </summary>
-    /// <typeparam name="T">the unmanaged type for <see cref="NetworkVariable{T}"/> </typeparam>
     [Serializable]
     public class NetworkVariable<T> : NetworkVariableBase where T : unmanaged
     {
+        // Functions that know how to serialize INetworkSerializable
+        internal static void WriteNetworkSerializable<TForMethod>(FastBufferWriter writer, in TForMethod value)
+            where TForMethod : INetworkSerializable, new()
+        {
+            writer.WriteNetworkSerializable(value);
+        }
+        internal static void ReadNetworkSerializable<TForMethod>(FastBufferReader reader, out TForMethod value)
+            where TForMethod : INetworkSerializable, new()
+        {
+            reader.ReadNetworkSerializable(out value);
+        }
+
+        // Functions that serialize other types
+        private static void WriteValue<TForMethod>(FastBufferWriter writer, in TForMethod value)
+            where TForMethod : unmanaged
+        {
+            writer.WriteValueSafe(value);
+        }
+
+        private static void ReadValue<TForMethod>(FastBufferReader reader, out TForMethod value)
+            where TForMethod : unmanaged
+        {
+            reader.ReadValueSafe(out value);
+        }
+
+        internal delegate void WriteDelegate<TForMethod>(FastBufferWriter writer, in TForMethod value);
+
+        internal delegate void ReadDelegate<TForMethod>(FastBufferReader reader, out TForMethod value);
+
+        // These static delegates provide the right implementation for writing and reading a particular network variable type.
+        // For most types, these default to WriteValue() and ReadValue(), which perform simple memcpy operations.
+        //
+        // INetworkSerializableILPP will generate startup code that will set it to WriteNetworkSerializable()
+        // and ReadNetworkSerializable() for INetworkSerializable types, which will call NetworkSerialize().
+        //
+        // In the future we may be able to use this to provide packing implementations for floats and integers to optimize bandwidth usage.
+        //
+        // The reason this is done is to avoid runtime reflection and boxing in NetworkVariable - without this,
+        // NetworkVariable would need to do a `var is INetworkSerializable` check, and then cast to INetworkSerializable,
+        // *both* of which would cause a boxing allocation. Alternatively, NetworkVariable could have been split into
+        // NetworkVariable and NetworkSerializableVariable or something like that, which would have caused a poor
+        // user experience and an API that's easier to get wrong than right. This is a bit ugly on the implementation
+        // side, but it gets the best achievable user experience and performance.
+        internal static WriteDelegate<T> Write = WriteValue;
+        internal static ReadDelegate<T> Read = ReadValue;
+
+
         /// <summary>
         /// Delegate type for value changed event
         /// </summary>
@@ -23,12 +69,7 @@ namespace Unity.Netcode
         /// </summary>
         public OnValueChangedDelegate OnValueChanged;
 
-        /// <summary>
-        /// Constructor for <see cref="NetworkVariable{T}"/>
-        /// </summary>
-        /// <param name="value">initial value set that is of type T</param>
-        /// <param name="readPerm">the <see cref="NetworkVariableReadPermission"/> for this <see cref="NetworkVariable{T}"/></param>
-        /// <param name="writePerm">the <see cref="NetworkVariableWritePermission"/> for this <see cref="NetworkVariable{T}"/></param>
+
         public NetworkVariable(T value = default,
             NetworkVariableReadPermission readPerm = DefaultReadPerm,
             NetworkVariableWritePermission writePerm = DefaultWritePerm)
@@ -37,9 +78,6 @@ namespace Unity.Netcode
             m_InternalValue = value;
         }
 
-        /// <summary>
-        /// The internal value of the NetworkVariable
-        /// </summary>
         [SerializeField]
         private protected T m_InternalValue;
 
@@ -67,7 +105,7 @@ namespace Unity.Netcode
         }
 
         // Compares two values of the same unmanaged type by underlying memory
-        // Ignoring any overridden value checks
+        // Ignoring any overriden value checks
         // Size is fixed
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe bool ValueEquals(ref T a, ref T b)
@@ -80,11 +118,7 @@ namespace Unity.Netcode
             return UnsafeUtility.MemCmp(aptr, bptr, sizeof(T)) == 0;
         }
 
-        /// <summary>
-        /// Sets the <see cref="Value"/>, marks the <see cref="NetworkVariable{T}"/> dirty, and invokes the <see cref="OnValueChanged"/> callback
-        /// if there are subscribers to that event.
-        /// </summary>
-        /// <param name="value">the new value of type `T` to be set/></param>
+
         private protected void Set(T value)
         {
             m_IsDirty = true;
@@ -109,13 +143,8 @@ namespace Unity.Netcode
         /// <param name="keepDirtyDelta">Whether or not the container should keep the dirty delta, or mark the delta as consumed</param>
         public override void ReadDelta(FastBufferReader reader, bool keepDirtyDelta)
         {
-            // todo:
-            // keepDirtyDelta marks a variable received as dirty and causes the server to send the value to clients
-            // In a prefect world, whether a variable was A) modified locally or B) received and needs retransmit
-            // would be stored in different fields
-
             T previousValue = m_InternalValue;
-            NetworkVariableSerialization<T>.Read(reader, out m_InternalValue);
+            Read(reader, out m_InternalValue);
 
             if (keepDirtyDelta)
             {
@@ -128,13 +157,13 @@ namespace Unity.Netcode
         /// <inheritdoc />
         public override void ReadField(FastBufferReader reader)
         {
-            NetworkVariableSerialization<T>.Read(reader, out m_InternalValue);
+            Read(reader, out m_InternalValue);
         }
 
         /// <inheritdoc />
         public override void WriteField(FastBufferWriter writer)
         {
-            NetworkVariableSerialization<T>.Write(writer, ref m_InternalValue);
+            Write(writer, m_InternalValue);
         }
     }
 }
