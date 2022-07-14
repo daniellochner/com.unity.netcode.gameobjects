@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.Collections;
 using UnityEngine;
 
 namespace Unity.Netcode
@@ -127,6 +126,7 @@ namespace Unity.Netcode
         /// Returns a list of all NetworkObjects that belong to a client.
         /// </summary>
         /// <param name="clientId">the client's id  <see cref="NetworkManager.LocalClientId"/></param>
+        /// <returns>returns the list of <see cref="NetworkObject"/>s owned by the client</returns>
         public List<NetworkObject> GetClientOwnedObjects(ulong clientId)
         {
             if (!OwnershipToObjectsTable.ContainsKey(clientId))
@@ -135,23 +135,6 @@ namespace Unity.Netcode
             }
             return OwnershipToObjectsTable[clientId].Values.ToList();
         }
-
-
-        private struct TriggerData
-        {
-            public FastBufferReader Reader;
-            public MessageHeader Header;
-            public ulong SenderId;
-            public float Timestamp;
-            public int SerializedHeaderSize;
-        }
-        private struct TriggerInfo
-        {
-            public float Expiry;
-            public NativeList<TriggerData> TriggerData;
-        }
-
-        private readonly Dictionary<ulong, TriggerInfo> m_Triggers = new Dictionary<ulong, TriggerInfo>();
 
         /// <summary>
         /// Gets the NetworkManager associated with this SpawnManager.
@@ -190,9 +173,11 @@ namespace Unity.Netcode
             return GetPlayerNetworkObject(NetworkManager.LocalClientId);
         }
 
+
         /// <summary>
         /// Returns the player object with a given clientId or null if one does not exist. This is only valid server side.
         /// </summary>
+        /// <param name="clientId">the client identifier of the player</param>
         /// <returns>The player object with a given clientId or null if one does not exist</returns>
         public NetworkObject GetPlayerNetworkObject(ulong clientId)
         {
@@ -207,87 +192,6 @@ namespace Unity.Netcode
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// Defers processing of a message until the moment a specific networkObjectId is spawned.
-        /// This is to handle situations where an RPC or other object-specific message arrives before the spawn does,
-        /// either due to it being requested in OnNetworkSpawn before the spawn call has been executed
-        ///
-        /// There is a one second maximum lifetime of triggers to avoid memory leaks. After one second has passed
-        /// without the requested object ID being spawned, the triggers for it are automatically deleted.
-        /// </summary>
-        internal unsafe void TriggerOnSpawn(ulong networkObjectId, FastBufferReader reader, ref NetworkContext context)
-        {
-            if (!m_Triggers.ContainsKey(networkObjectId))
-            {
-                m_Triggers[networkObjectId] = new TriggerInfo
-                {
-                    Expiry = Time.realtimeSinceStartup + 1,
-                    TriggerData = new NativeList<TriggerData>(Allocator.Persistent)
-                };
-            }
-
-            m_Triggers[networkObjectId].TriggerData.Add(new TriggerData
-            {
-                Reader = new FastBufferReader(reader.GetUnsafePtr(), Allocator.Persistent, reader.Length),
-                Header = context.Header,
-                Timestamp = context.Timestamp,
-                SenderId = context.SenderId,
-                SerializedHeaderSize = context.SerializedHeaderSize
-            });
-        }
-
-        /// <summary>
-        /// Cleans up any trigger that's existed for more than a second.
-        /// These triggers were probably for situations where a request was received after a despawn rather than before a spawn.
-        /// </summary>
-        internal unsafe void CleanupStaleTriggers()
-        {
-            ulong* staleKeys = stackalloc ulong[m_Triggers.Count()];
-            int index = 0;
-            foreach (var kvp in m_Triggers)
-            {
-                if (kvp.Value.Expiry < Time.realtimeSinceStartup)
-                {
-
-                    staleKeys[index++] = kvp.Key;
-                    if (NetworkLog.CurrentLogLevel <= LogLevel.Normal)
-                    {
-                        NetworkLog.LogWarning($"Deferred messages were received for {nameof(NetworkObject)} #{kvp.Key}, but it did not spawn within 1 second.");
-                    }
-
-                    foreach (var data in kvp.Value.TriggerData)
-                    {
-                        data.Reader.Dispose();
-                    }
-
-                    kvp.Value.TriggerData.Dispose();
-                }
-            }
-
-            for (var i = 0; i < index; ++i)
-            {
-                m_Triggers.Remove(staleKeys[i]);
-            }
-        }
-        /// <summary>
-        /// Cleans up any trigger that's existed for more than a second.
-        /// These triggers were probably for situations where a request was received after a despawn rather than before a spawn.
-        /// </summary>
-        internal void CleanupAllTriggers()
-        {
-            foreach (var kvp in m_Triggers)
-            {
-                foreach (var data in kvp.Value.TriggerData)
-                {
-                    data.Reader.Dispose();
-                }
-
-                kvp.Value.TriggerData.Dispose();
-            }
-
-            m_Triggers.Clear();
         }
 
         internal void RemoveOwnership(NetworkObject networkObject)
@@ -382,10 +286,37 @@ namespace Unity.Netcode
             }
         }
 
+        internal bool HasPrefab(NetworkObject.SceneObject sceneObject)
+        {
+            if (!NetworkManager.NetworkConfig.EnableSceneManagement || !sceneObject.Header.IsSceneObject)
+            {
+                if (NetworkManager.PrefabHandler.ContainsHandler(sceneObject.Header.Hash))
+                {
+                    return true;
+                }
+                if (NetworkManager.NetworkConfig.NetworkPrefabOverrideLinks.TryGetValue(sceneObject.Header.Hash, out var networkPrefab))
+                {
+                    switch (networkPrefab.Override)
+                    {
+                        default:
+                        case NetworkPrefabOverride.None:
+                            return networkPrefab.Prefab != null;
+                        case NetworkPrefabOverride.Hash:
+                        case NetworkPrefabOverride.Prefab:
+                            return networkPrefab.OverridingTargetPrefab != null;
+                    }
+                }
+
+                return false;
+            }
+            var networkObject = NetworkManager.SceneManager.GetSceneRelativeInSceneNetworkObject(sceneObject.Header.Hash, sceneObject.NetworkSceneHandle);
+            return networkObject != null;
+        }
+
         /// <summary>
         /// Should only run on the client
         /// </summary>
-        internal NetworkObject CreateLocalNetworkObject(bool isSceneObject, uint globalObjectIdHash, ulong ownerClientId, ulong? parentNetworkId, Vector3? position, Quaternion? rotation, bool isReparented = false)
+        internal NetworkObject CreateLocalNetworkObject(bool isSceneObject, uint globalObjectIdHash, ulong ownerClientId, ulong? parentNetworkId, int? networkSceneHandle, Vector3? position, Quaternion? rotation, bool isReparented = false)
         {
             NetworkObject parentNetworkObject = null;
 
@@ -476,7 +407,7 @@ namespace Unity.Netcode
             }
             else
             {
-                var networkObject = NetworkManager.SceneManager.GetSceneRelativeInSceneNetworkObject(globalObjectIdHash);
+                var networkObject = NetworkManager.SceneManager.GetSceneRelativeInSceneNetworkObject(globalObjectIdHash, networkSceneHandle);
 
                 if (networkObject == null)
                 {
@@ -549,15 +480,23 @@ namespace Unity.Netcode
                 return;
             }
 
-            // this initialization really should be at the bottom of the function
             networkObject.IsSpawned = true;
-
-            // this initialization really should be at the top of this function. If and when we break the
-            //  NetworkVariable dependency on NetworkBehaviour, this otherwise creates problems because
-            //  SetNetworkVariableData above calls InitializeVariables, and the 'baked out' data isn't ready there;
-            //  the current design banks on getting the network behaviour set and then only reading from it after the
-            //  below initialization code. However cowardice compels me to hold off on moving this until that commit
             networkObject.IsSceneObject = sceneObject;
+
+            // Always check to make sure our scene of origin is properly set for in-scene placed NetworkObjects
+            // Note: Always check SceneOriginHandle directly at this specific location.
+            if (networkObject.IsSceneObject != false && networkObject.SceneOriginHandle == 0)
+            {
+                networkObject.SceneOrigin = networkObject.gameObject.scene;
+            }
+
+            // For integration testing, this makes sure that the appropriate NetworkManager is assigned to
+            // the NetworkObject since it uses the NetworkManager.Singleton when not set
+            if (networkObject.NetworkManagerOwner != NetworkManager)
+            {
+                networkObject.NetworkManagerOwner = NetworkManager;
+            }
+
             networkObject.NetworkObjectId = networkId;
 
             networkObject.DestroyWithScene = sceneObject || destroyWithScene;
@@ -565,6 +504,12 @@ namespace Unity.Netcode
             networkObject.OwnerClientId = ownerClientId;
 
             networkObject.IsPlayerObject = playerObject;
+
+			NetworkVariant variant = networkObject.GetComponent<NetworkVariant>();
+			if (variant != null && networkObject.IsOwner)
+			{
+				variant.Swap();
+			}
 
             SpawnedObjects.Add(networkObject.NetworkObjectId, networkObject);
             SpawnedObjectsList.Add(networkObject);
@@ -612,20 +557,7 @@ namespace Unity.Netcode
 
             networkObject.InvokeBehaviourNetworkSpawn();
 
-            // This must happen after InvokeBehaviourNetworkSpawn, otherwise ClientRPCs and other messages can be
-            // processed before the object is fully spawned. This must be the last thing done in the spawn process.
-            if (m_Triggers.ContainsKey(networkId))
-            {
-                var triggerInfo = m_Triggers[networkId];
-                foreach (var trigger in triggerInfo.TriggerData)
-                {
-                    // Reader will be disposed within HandleMessage
-                    NetworkManager.MessagingSystem.HandleMessage(trigger.Header, trigger.Reader, trigger.SenderId, trigger.Timestamp, trigger.SerializedHeaderSize);
-                }
-
-                triggerInfo.TriggerData.Dispose();
-                m_Triggers.Remove(networkId);
-            }
+            NetworkManager.DeferredMessageManager.ProcessTriggers(IDeferredMessageManager.TriggerType.OnSpawn, networkId);
 
             // propagate the IsSceneObject setting to child NetworkObjects
             var children = networkObject.GetComponentsInChildren<NetworkObject>();
@@ -637,9 +569,8 @@ namespace Unity.Netcode
 
         internal void SendSpawnCallForObject(ulong clientId, NetworkObject networkObject)
         {
-            //Currently, if this is called and the clientId (destination) is the server's client Id, this case will be checked
-            // within the below Send function.  To avoid unwarranted allocation of a PooledNetworkBuffer placing this check here. [NSS]
-            if (NetworkManager.IsServer && clientId == NetworkManager.ServerClientId)
+            // If we are a host and sending to the host's client id, then we can skip sending ourselves the spawn message.
+            if (clientId == NetworkManager.ServerClientId)
             {
                 return;
             }
@@ -870,7 +801,8 @@ namespace Unity.Netcode
 
                         var message = new DestroyObjectMessage
                         {
-                            NetworkObjectId = networkObject.NetworkObjectId
+                            NetworkObjectId = networkObject.NetworkObjectId,
+                            DestroyGameObject = networkObject.IsSceneObject != false ? destroyGameObject : true
                         };
                         var size = NetworkManager.SendMessage(ref message, NetworkDelivery.ReliableSequenced, m_TargetClientIds);
                         foreach (var targetClientId in m_TargetClientIds)
@@ -887,6 +819,9 @@ namespace Unity.Netcode
             {
                 SpawnedObjectsList.Remove(networkObject);
             }
+
+            // Always clear out the observers list when despawned
+            networkObject.Observers.Clear();
 
             var gobj = networkObject.gameObject;
             if (destroyGameObject && gobj != null)
